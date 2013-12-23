@@ -74,7 +74,6 @@ catch(Exception $e) {
   throw new Exception($e->getMessage());
 }
 
-// XXX move this above set_include_path and see if set_include_path can be removed
 Defaults::$useUrlBasedVersioning = true;
 
 $r = new Restler();
@@ -82,6 +81,7 @@ $r->setApiVersion(1);
 
 // Attach classes for ID Match API services
 $r->addAPIClass('People', 'people');
+$r->addAPIClass('ReferenceIds', 'referenceIds');
 // XXX add support for these
 //$r->addAPIClass('PendingMatches', 'pendingMatches');
 //$r->addAPIClass('SorPeople', 'sorPeople');

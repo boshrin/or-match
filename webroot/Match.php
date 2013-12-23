@@ -561,4 +561,31 @@ class Match {
     
     return $candidates;
   }
+  
+  /**
+   * Obtain the SOR Records associated with a reference identifier
+   *
+   * @since  0.9
+   * @param  string  $referenceId Reference ID
+   * @return Array   Array of SOR data (empty if no records found)
+   */
+  
+  public function sorRecords($referenceId) {
+    global $dbh;
+    $ret = array();
+    
+    $sql = "SELECT * FROM matchgrid WHERE reference_id=?";
+    
+    $stmt = $dbh->Prepare($sql);
+    
+    $r = $dbh->Execute($stmt, array($referenceId));
+      
+    while(!$r->EOF) {
+      $ret[] = $this->mapResponseFields($r->fields);
+      
+      $r->MoveNext();
+    }
+    
+    return $ret;
+  }
 }
