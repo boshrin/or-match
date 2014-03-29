@@ -34,7 +34,7 @@ class Logger {
    */
   
   public function info($msg) {
-    $str .= getmypid() . $msg . "\n";
+    $str .= getmypid() . " " . $msg . "\n";
     
     if($this->lconfig['method'] == 'file') {
       $str = date('d M Y h:i:s') . ": " . $str;

@@ -5,7 +5,7 @@
  * @package    or-match
  * @since      0.9
  * @author     Benn Oshrin
- * @copyright  Copyright (c) 2013, University of California, Berkeley
+ * @copyright  Copyright (c) 2013-4, University of California, Berkeley
  * @license    http://opensource.org/licenses/BSD-3-Clause BSD
  * @link       https://github.com/ucidentity/or-match
  */
@@ -15,7 +15,7 @@ class Match {
   private $requestAttributes = null;
   
   /**
-   * Perform a match and return candidates
+   * Perform a match and return candidates. This function should be called from within a transaction.
    *
    * @since  0.9
    * @param  string $sor         Label for requesting System of Record
@@ -42,15 +42,11 @@ class Match {
     $this->requestAttributes['sorid'] = $sorid;
     
     try {
-      $dbh->StartTrans();
-      
       $candidates = $this->searchDatabase('canonical');
       
       if(empty($candidates)) {
         $candidates = $this->searchDatabase('potential');
       }
-      
-      $dbh->CompleteTrans();
     }
     catch(InvalidArgumentException $e) {
       throw new InvalidArgumentException($e->getMessage());
@@ -587,5 +583,69 @@ class Match {
     }
     
     return $ret;
+  }
+  
+  /**
+   * Update matchgrid based on a provided SOR and SORID with new attributes. This does not perform rematching.
+   *
+   * @since  0.9
+   * @param  string  $sor         Label for requesting System of Record
+   * @param  string  $sorid       SoR identifier for search request
+   * @param  array   $attributes  Attributes provided for searching
+   * @return string  Reference ID of record (which for now will always be what it originally was)
+   * @todo   Offer a rematch option?
+   */
+  
+  public function update($sor, $sorid, $sorAttributes) {
+    global $dbh;
+    global $matchConfig;
+    
+    $sql = "UPDATE matchgrid
+            SET ";
+    
+    $vals = array();
+    
+    // Process the configured attributes (except sor/sorid, which are handled specially)
+    
+    $comma = false;
+    
+    foreach(array_keys($matchConfig['attributes']) as $a) {
+      if($matchConfig['attributes'][$a]['column'] == 'sor'
+         || $matchConfig['attributes'][$a]['column'] == 'sorid') {
+        continue;
+      }
+      
+      // After the first attribute we need a comma
+      if($comma) { $sql .= ","; }
+      
+      $v = $this->findRequestedAttrValue($a);
+      
+      if($v) {
+        $sql .= $matchConfig['attributes'][$a]['column'] . "=?";
+        $vals[] = $v;
+      } else {
+        $sql .= $matchConfig['attributes'][$a]['column'] . "=NULL";
+      }
+      
+      $comma = true;
+    }
+    
+    $sql .= "
+             WHERE sor=?
+             AND   sorid=?
+             RETURNING id";
+    
+    $vals[] = $sor;
+    $vals[] = $sorid;
+    
+    $stmt = $dbh->Prepare($sql);
+    
+    global $log;
+        $log->info("QUERY: " . $sql . "; PARAMS: " . join(",", $vals), "sql");
+
+    // XXX this may not work for databases other than Postgres (known not to work for Oracle)
+    $rowid = $dbh->GetOne($stmt, $vals);
+    
+    return $rowid;
   }
 }
