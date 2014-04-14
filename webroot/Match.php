@@ -136,7 +136,7 @@ class Match {
    * @return string UUID
    */   
   
-  public static function generatev4uuid() {
+  protected static function generatev4uuid() {
     return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
       
       // 32 bits for "time_low"
@@ -169,23 +169,40 @@ class Match {
    * @param  string  $referenceId Reference ID, or null if unknown
    * @param  boolean $assign      If no reference ID, assign a new one if true (else pending resolution)
    * @return Reference ID if $assign is true, or the row ID (for use as a match request identifier) if both $assign and $referenceId are false/null
+   * @throws RuntimeException
    */
   
   public function insert($sor, $sorid, $sorAttributes, $referenceId=null, $assign=false) {
     global $dbh;
+    global $config;
     global $matchConfig;
     
-    $uuid = $referenceId;
+    $insertedReferenceId = $referenceId;
     $rowid = null;
     $requestTime = gmdate('Y-m-d H:i:s');
     $resolutionTime = null;
     
     if($assign) {
-      // Generate a UUID and timestamp
-      $uuid = $this->generatev4uuid();
+      // Assign an identifier according to our configuration
+      
+      switch($config['referenceid']['method']) {
+        case 'sequence':
+          // Obtain the next integer
+          // Note GenID will create the sequence if it doesn't already exist
+          $insertedReferenceId = $dbh->GenID('reference_id_seq');
+          break;
+        case 'uuid':
+          // Generate a UUID
+          $insertedReferenceId = $this->generatev4uuid();
+          break;
+        default:
+          throw new RuntimeException("Unknown reference id assignment method: " . $config['referenceid']['method']);
+          break;
+      }
     }
     
     if($referenceId || $assign) {
+      // Generate a timestamp
       $resolutionTime = $requestTime;
     }
     
@@ -196,7 +213,7 @@ class Match {
              request_time,
              resolution_time";
     
-    $vals = array($sor, $sorid, $uuid, $requestTime, $resolutionTime);
+    $vals = array($sor, $sorid, $insertedReferenceId, $requestTime, $resolutionTime);
     
     // Next process the configured attributes (except sor/sorid, already done)
     
@@ -227,7 +244,7 @@ class Match {
     if(!$referenceId && !$assign) {
       return $rowid;
     } else {
-      return $uuid;
+      return $insertedReferenceId;
     }
   }
   
@@ -640,9 +657,6 @@ class Match {
     
     $stmt = $dbh->Prepare($sql);
     
-    global $log;
-        $log->info("QUERY: " . $sql . "; PARAMS: " . join(",", $vals), "sql");
-
     // XXX this may not work for databases other than Postgres (known not to work for Oracle)
     $rowid = $dbh->GetOne($stmt, $vals);
     
