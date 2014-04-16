@@ -119,6 +119,12 @@ class People {
           $referenceId = $Match->insert($sor, $sorid, $sorAttributes, null, true);
           
           $result->referenceId = $referenceId;
+          if(!empty($config['referenceid']['responsetype'])) {
+            $result->identifiers[] = array(
+              'type'       => $config['referenceid']['responsetype'],
+              'identifier' => $referenceId
+            );
+          }
           $retCode = 201;
         }
       } elseif(count($candidates) == 1) {
@@ -132,7 +138,14 @@ class People {
           $result->referenceId = $candidate[0]['id'];
 //        $result->confidence = $candidate[0]['confidence'];
 //        $result->attributes = $candidate[0]['attributes'];
-
+          
+          if(!empty($config['referenceid']['responsetype'])) {
+            $result->identifiers[] = array(
+              'type'       => $config['referenceid']['responsetype'],
+              'identifier' => $candidate[0]['id']
+            );
+          }
+          
           // If this is a match against sor+sorid (which really should have been sent as
           // an attribute update) then we promote this to be an update, not an insert.
           
