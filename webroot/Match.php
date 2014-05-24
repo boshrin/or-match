@@ -359,6 +359,7 @@ class Match {
       
       $sql = "SELECT *
               FROM   matchgrid
+              WHERE  reference_id IS NOT NULL
               ";
       
       $vals = array();
@@ -379,11 +380,7 @@ class Match {
           throw new InvalidArgumentException("Attribute '" . $attr . "' is not configured for '" . $rule . "' search");
         }
         
-        if(count($vals) == 0) {
-          $sql .= "WHERE ";
-        } else {
-          $sql .= " AND ";
-        }
+        $sql .= " AND ";
         
         // Assemble an appropriate clause according to the configuration, and also
         // adjust $searchVal as needed
@@ -494,16 +491,14 @@ class Match {
           $sor = $r->fields['sor'];
           $sorid = $r->fields['sorid'];
           
-          foreach($candidates[$referenceId] as $c) {
-            foreach($c as $a) {
-              if($a['sor'] == $sor) {
-                // Look for the correct identifier entry
-                
-                foreach($a['identifiers'] as $i) {
-                  if($i['type'] == 'sor' && $i['identifier'] == $sorid) {
-                    $skip = true;
-                    break 3;
-                  }
+          foreach($candidates[$referenceId]['attributes'] as $a) {
+            if($a['sor'] == $sor) {
+              // Look for the correct identifier entry
+              
+              foreach($a['identifiers'] as $i) {
+                if($i['type'] == 'sor' && $i['identifier'] == $sorid) {
+                  $skip = true;
+                  break 3;
                 }
               }
             }
