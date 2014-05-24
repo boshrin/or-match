@@ -5,7 +5,7 @@
  * @package    or-match
  * @since      0.9
  * @author     Benn Oshrin
- * @copyright  Copyright (c) 2013, University of California, Berkeley
+ * @copyright  Copyright (c) 2013-14, University of California, Berkeley
  * @license    http://opensource.org/licenses/BSD-3-Clause BSD
  * @link       https://github.com/ucidentity/or-match
  */
@@ -34,7 +34,7 @@ class Logger {
    */
   
   public function info($msg) {
-    $str .= getmypid() . " " . $msg . "\n";
+    $str = getmypid() . " " . $msg . "\n";
     
     if($this->lconfig['method'] == 'file') {
       $str = date('d M Y h:i:s') . ": " . $str;

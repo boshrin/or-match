@@ -391,13 +391,15 @@ class Match {
         $select = "";
         
         // Case insensitive?
-        if($matchConfig['attributes'][$attr]['casesensitive']) {
+        if(isset($matchConfig['attributes'][$attr]['casesensitive'])
+           && $matchConfig['attributes'][$attr]['casesensitive']) {
           $select .= "lower(";
           $searchVal = strtolower($searchVal);
         }
         
         // Strip out non-alphanumeric characters?
-        if($matchConfig['attributes'][$attr]['alphanum']) {
+        if(isset($matchConfig['attributes'][$attr]['alphanum'])
+           && $matchConfig['attributes'][$attr]['alphanum']) {
           $select .= "regexp_replace(";
           $searchVal = preg_replace('/[^A-Za-z0-9]/', '', $searchVal);
         }
@@ -406,11 +408,13 @@ class Match {
         $select .= $matchConfig['attributes'][$attr]['column'];
         
         // Close any statement we opened
-        if($matchConfig['attributes'][$attr]['alphanum']) {
+        if(isset($matchConfig['attributes'][$attr]['alphanum'])
+           && $matchConfig['attributes'][$attr]['alphanum']) {
           $select .= ", '[^A-Za-z0-9]', '', 'g')";
         }
         
-        if($matchConfig['attributes'][$attr]['casesensitive']) {
+        if(isset($matchConfig['attributes'][$attr]['casesensitive'])
+           && $matchConfig['attributes'][$attr]['casesensitive']) {
           $select .= ")";
         }
         
