@@ -176,11 +176,55 @@ class Match {
     global $dbh;
     global $config;
     global $matchConfig;
+    global $log;
     
     $insertedReferenceId = $referenceId;
     $rowid = null;
     $requestTime = gmdate('Y-m-d H:i:s');
     $resolutionTime = null;
+    
+    $dbh->StartTrans();
+    
+    // First, see if there is already an entry in matchgrid for sor+sorid
+    
+    $sql = "SELECT *
+            FROM   matchgrid
+            WHERE  sor=" . $dbh->Param('a') . "
+            AND    sorid=" . $dbh->Param('b');
+    
+    $stmt = $dbh->Prepare($sql);
+    $row = $dbh->GetRow($stmt, array($sor, $sorid));
+    
+    if(!$row) {
+      $dbh->CompleteTrans();
+      throw new RuntimeException("Failed to check matchgrid for existing entry: " . $dbh->ErrorMsg());
+    }
+    
+    if(!empty($row['id'])) {
+      // A row was returned
+      
+      if(!empty($row['reference_id'])) {
+        // An existing record was found. This should already have been caught
+        // and promoted to an update() by the calling code.
+        
+        $dbh->FailTrans();
+        $dbh->CompleteTrans();
+        throw new RuntimeException("Existing record found during insert (calling code should promote to update)");
+      } else {
+        // A previous request was submitted and generated a fuzzy match.
+        // Replace it.
+        
+        $log->info("Existing unreconciled record found for " . $sor . "/"
+                   . $sorid . ", replacing");
+        
+        $sql = "DELETE FROM matchgrid
+                WHERE  sor=" . $dbh->Param('a') . "
+                AND    sorid=" . $dbh->Param('b');
+        
+        $stmt = $dbh->Prepare($sql);
+        $dbh->Execute($stmt, array($sor, $sorid));
+      }
+    }
     
     if($assign) {
       // Assign an identifier according to our configuration
@@ -196,6 +240,8 @@ class Match {
           $insertedReferenceId = $this->generatev4uuid();
           break;
         default:
+          $dbh->FailTrans();
+          $dbh->CompleteTrans();
           throw new RuntimeException("Unknown reference id assignment method: " . $config['referenceid']['method']);
           break;
       }
@@ -240,6 +286,8 @@ class Match {
     
     // XXX this may not work for databases other than Postgres (known not to work for Oracle)
     $rowid = $dbh->GetOne($stmt, $vals);
+    
+    $dbh->CompleteTrans();
     
     if(!$referenceId && !$assign) {
       return $rowid;
