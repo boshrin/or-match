@@ -424,7 +424,7 @@ class Match {
         
         // Case insensitive?
         if(isset($matchConfig['attributes'][$attr]['casesensitive'])
-           && $matchConfig['attributes'][$attr]['casesensitive']) {
+           && !$matchConfig['attributes'][$attr]['casesensitive']) {
           $select .= "lower(";
           $searchVal = strtolower($searchVal);
         }
@@ -446,7 +446,7 @@ class Match {
         }
         
         if(isset($matchConfig['attributes'][$attr]['casesensitive'])
-           && $matchConfig['attributes'][$attr]['casesensitive']) {
+           && !$matchConfig['attributes'][$attr]['casesensitive']) {
           $select .= ")";
         }
         
