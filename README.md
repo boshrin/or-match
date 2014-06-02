@@ -213,6 +213,17 @@ SSN would otherwise be a canonical match.
 
 Default if not specified: false
 
+### 'nullequivalents' Keyword
+
+This boolean keyword determines if strings consisting of only blanks, zeroes,
+and punctutation should be considered equivalent to null (not specified)
+strings.
+
+For example, if set to true the strings "000-00-0000" and " " will be treated
+as if they were not specified.
+
+Default if not specified: true
+
 ### `search` Keyword
 
 The search keyword defines how this attribute can be searched. More than one

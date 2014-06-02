@@ -71,10 +71,12 @@ class Match {
   
   private function findRequestedAttrValue($attr) {
     global $matchConfig;
+    global $log;
     
     // $attr is the configuration label. Map it to the wire name.
     $wireAttribute = null;
     $grouping = null;
+    $value = null;
     
     if(!empty($matchConfig['attributes'][$attr]['attribute'])) {
       $wireAttribute = $matchConfig['attributes'][$attr]['attribute'];
@@ -94,7 +96,7 @@ class Match {
             if(!empty($xi['type']) && $xi['type'] == $n[1]) {
               // We've found the matching identifier type
               if(!empty($xi['identifier'])) {
-                return $xi['identifier'];
+                $value = $xi['identifier'];
               }
               break;
             }
@@ -108,21 +110,36 @@ class Match {
             if(!empty($xi['type']) && $xi['type'] == $grouping) {
               // We've found the matching name type
               if(!empty($xi[ $n[1] ])) {
-                return $xi[ $n[1] ];
+                $value = $xi[ $n[1] ];
               }
               break;
             }
           }
           break;
         case 'sor':
-          return $this->requestAttributes['sor'];
+          $value = $this->requestAttributes['sor'];
           break;
         case 'identifier:sor':
-          return $this->requestAttributes['sorid'];
+          $value = $this->requestAttributes['sorid'];
           break;
         default:
-          return $this->requestAttributes[$wireAttribute];
+          $value = $this->requestAttributes[$wireAttribute];
           break;
+      }
+    }
+    
+    if($value) {
+      // If nullequivalents and $value is only spaces, zeroes and punctuation,
+      // return null
+      
+      if(!isset($matchConfig['attributes'][$attr]['nullequivalents'])
+         || $matchConfig['attributes'][$attr]['nullequivalents']) {
+        // Our actual test is that a non-zero number of any letter is in $value
+        if(preg_match('/[1-9[:alpha:]]/', $value)) {
+          return $value;
+        } else {
+          $log->info("Ignoring null equivalent value '" . $value . "' for " . $attr);
+        }
       }
     }
     
