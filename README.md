@@ -237,11 +237,16 @@ is configured via the `confidence` Section.
   modifiers much as `alphanum` and `casesensitive`.
 * `exact`: Boolean. An exact search only matches when the exact string matches,
   subject to modifiers much as alphanum and casesensitive.
+* `substr`: String of the format `"from,for"`. A substring match is like an
+  exact match, but applies only to the specified substring. Note that
+  *from* and *for* are specified as for the SQL `substring` function, so the
+  leftmost character is `1`, not `0`. To perform a substring match against the
+  first three characters of a string, use `"1,3"`.
 
 Addition search types may be supported in the future
 ([Issue #12] (https://github.com/ucidentity/or-match/issues/12),
 [Issue #13] (https://github.com/ucidentity/or-match/issues/13), and
-[Issue #16] (https://github.com/ucidentity/or-match/issues/16)).
+[Issue #23] (https://github.com/ucidentity/or-match/issues/23)).
 
 ### Example
 
@@ -269,6 +274,7 @@ Addition search types may be supported in the future
     casesensitive = false
     search['exact'] = true
     search['distance'] = 2
+    search['substr'] = "1,3"
     
     [attribute:lastname]
     desc = "Family Name (official)"
@@ -387,7 +393,7 @@ All potential match queries will be tried, even if a match is found.
     set1['dob'] = "distance"
     
     set2['ssn'] = "distance"
-    set2['firstname'] = "exact"
+    set2['firstname'] = "substr"
     set2['lastname'] = "exact"
     set2['dob'] = "exact"
 

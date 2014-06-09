@@ -179,7 +179,7 @@ class People {
         
         foreach($candidates as $candidate) {
           if($this->checkCandidateSorId($candidate['attributes'][0], $sor, $sorid)) {
-            $log->info("Converting fuzzy match to conflict due to existing match for " . $sor . "/" . $sorid);
+            $log->info("Converted fuzzy match to conflict due to existing match for " . $sor . "/" . $sorid);
             $retCode = 409;
             break;
           }
@@ -222,6 +222,8 @@ class People {
     }
     
     $dbh->CompleteTrans();
+    
+    $log->info("Request completed, returning " . (($retCode > 0) ? $retCode : 200));
     
     ExtendedResponder::$result = $result;
    

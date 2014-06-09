@@ -471,7 +471,7 @@ class Match {
         
         switch($rule) {
           case 'distance':
-            $sql .= " levenshtein_less_equal("
+            $sql .= "levenshtein_less_equal("
                  . $select
                  . ",?,"
                  . $matchConfig['attributes'][$attr]['search'][$rule]
@@ -483,6 +483,17 @@ class Match {
             break;
           case 'soundex':
             throw new RuntimeException("Not implemented (soundex)");
+            break;
+          case 'substr':
+            // Pull out the from and for parameters
+            $a = explode(",", $matchConfig['attributes'][$attr]['search'][$rule], 2);
+            $sql .= "substring("
+                 . $select
+                 . " from "
+                 . $a[0] . " for " . $a[1]
+                 . ") = substring(? from "
+                 . $a[0] . " for " . $a[1]
+                 . ")";
             break;
           default:
             throw new InvalidArgumentException("Unknown search rule: " . $rule);
