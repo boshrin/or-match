@@ -189,6 +189,27 @@ underscores) and `group` corresponds to the value of the `group` keyword, if
 specified. For example: `attr_name_given_official` or
 `attr_identifier_national`.
 
+### `crosscheck` Keyword
+
+By default, a search request will only search the column specified for the
+attribute in the search request. (eg: The `dateOfBirth` attribute will only
+search the `attr_date_of_birth` column.) However, there are cases where it
+makes sense to search other columns as well. For example, if official name and
+"formerly known as" name are accepted, it may make sense to cross check the
+names against each other.
+
+`crosscheck` is specified with the key being the name of the attribute instance
+(*not* the column) to cross check. The value can either by `true` to search
+all records or an SOR label to restrict searchs only to the specified SOR.
+
+Searches will be executed using the same `search` type for the cross checked
+attribute as for the original attribute, so the appropiate `search` must be
+configured. eg: If the official name is being checked for distance, then the
+formerly known as name will also be checked for distance, but only if it too
+has a distance search configured.
+
+Multiple crosschecks may be specified, they will be OR'd together.
+
 ### `desc` Keyword
 
 Description of the attribute. This is for documentation purposes only.
@@ -292,6 +313,18 @@ Addition search types may be supported in the future
     alphanum = true
     search['exact'] = true
     search['distance'] = 2
+    
+    ; In this example, the studentid is provided by the HR system when it
+    ; knows it (eg: for a student employee), allowing it to be used as a
+    ; matching element
+    [attribute:studentid]
+    desc = "Student ID as asserted by HR system"
+    column = "attr_identifier_sor_student"
+    attribute = "identifier:sor-student"
+    casesensitive = true
+    search['exact'] = true
+    ; cross check against SORID, but only for student (SIS) records
+    crosscheck['sorid'] = "SIS"
 
 [auth] Section
 --------------

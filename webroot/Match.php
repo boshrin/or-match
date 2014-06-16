@@ -15,6 +15,140 @@ class Match {
   private $requestAttributes = null;
   
   /**
+   * Generate the SQL for a match query, according to the configuration.
+   *
+   * @since  0.9
+   * @param  string  $attr        Attribute to assemble SQL for
+   * @param  string  $rule        Rule to use in assembling SQL
+   * @param  boolean $crosscheck  If true, assemble SQL for crosscheck attributes
+   * @return array Array with elements 'sql' String SQL to be embedded in the match query, and 'values' a list of values for SQL parameters
+   * @throws InvalidArgumentException
+   */
+  
+  protected function buildAttributeSql($attr, $rule, $crosscheck=true) {
+    global $matchConfig;
+    $ret = array(
+      'sql'    => "",
+      'values' => array()
+    );
+    
+    $searchVal = $this->findRequestedAttrValue($attr);
+    
+    if(!$searchVal) {
+      throw new InvalidArgumentException("No value found in request payload for attribute '" . $attr . "'");
+    }
+    
+    // Make sure this attribute is specified for the requested search type
+    
+    if(!isset($matchConfig['attributes'][$attr]['search'][$rule])
+       || !($matchConfig['attributes'][$attr]['search'][$rule])) {
+      throw new InvalidArgumentException("Attribute '" . $attr . "' is not configured for '" . $rule . "' search");
+    }
+    
+    // Assemble an appropriate clause according to the configuration, and also
+    // adjust $searchVal as needed
+    
+    $select = "";
+    
+    // Case insensitive?
+    if(isset($matchConfig['attributes'][$attr]['casesensitive'])
+       && !$matchConfig['attributes'][$attr]['casesensitive']) {
+      $select .= "lower(";
+      $searchVal = strtolower($searchVal);
+    }
+    
+    // Strip out non-alphanumeric characters?
+    if(isset($matchConfig['attributes'][$attr]['alphanum'])
+       && $matchConfig['attributes'][$attr]['alphanum']) {
+      $select .= "regexp_replace(";
+      $searchVal = preg_replace('/[^A-Za-z0-9]/', '', $searchVal);
+    }
+    
+    // The actual column name
+    $select .= $matchConfig['attributes'][$attr]['column'];
+    
+    // Close any statement we opened
+    if(isset($matchConfig['attributes'][$attr]['alphanum'])
+       && $matchConfig['attributes'][$attr]['alphanum']) {
+      $select .= ", '[^A-Za-z0-9]', '', 'g')";
+    }
+    
+    if(isset($matchConfig['attributes'][$attr]['casesensitive'])
+       && !$matchConfig['attributes'][$attr]['casesensitive']) {
+      $select .= ")";
+    }
+    
+    $ret['values'][] = $searchVal;
+    
+    switch($rule) {
+      case 'distance':
+        $ret['sql'] .= "levenshtein_less_equal("
+                    . $select
+                    . ",?,"
+                    . $matchConfig['attributes'][$attr]['search'][$rule]
+                    . ") < "
+                    . ($matchConfig['attributes'][$attr]['search'][$rule] + 1);
+        break;
+      case 'exact':
+        $ret['sql'] .= $select . "=?";
+        break;
+      case 'soundex':
+        throw new RuntimeException("Not implemented (soundex)");
+        break;
+      case 'substr':
+        // Pull out the from and for parameters
+        $a = explode(",", $matchConfig['attributes'][$attr]['search'][$rule], 2);
+        $ret['sql'] .= "substring("
+                    . $select
+                    . " from "
+                    . $a[0] . " for " . $a[1]
+                    . ") = substring(? from "
+                    . $a[0] . " for " . $a[1]
+                    . ")";
+        break;
+      default:
+        throw new InvalidArgumentException("Unknown search rule: " . $rule);
+        break;
+    }
+    
+    if($crosscheck && !empty($matchConfig['attributes'][$attr]['crosscheck'])) {
+      // crosscheck will turn the response SQL from something like foo=? to
+      // something like (foo=? OR (bar=? and sor=?)) (where the sor part is
+      // optional)
+      
+      // There can be more than one crosscheck specified.
+      
+      foreach(array_keys($matchConfig['attributes'][$attr]['crosscheck']) as $xcattr) {
+        // Generate the appropriate SQL for this attribute and the current rule
+        
+        try {
+          $xcsql = $this->buildAttributeSql($xcattr, $rule, false);
+        }
+        catch(InvalidArgumentException $e) {
+          // Something went wrong, skip this attribute
+          $log->info($e->getMessage() . ", skipping this crosscheck");
+          continue;
+        }
+        
+        // Update our generated SQL. Note we ignore the value returned by
+        // buildAttributeSql and substitute the original search value.
+        
+        if($matchConfig['attributes'][$attr]['crosscheck'][$xcattr] !== true) {
+          // An SOR was specified to constrain the crosscheck
+          $ret['sql'] = "(" . $ret['sql'] . " OR (" . $xcsql['sql'] . " AND sor=?))";
+          $ret['values'][] = $searchVal;
+          $ret['values'][] = $matchConfig['attributes'][$attr]['crosscheck'][$xcattr];
+        } else {
+          $ret['sql'] = "(" . $ret['sql'] . " OR " . $xcsql['sql'] . ")";
+          $ret['values'] = $searchVal;
+        }
+      }
+    }
+    
+    return $ret;
+  }
+  
+  /**
    * Perform a match and return candidates. This function should be called from within a transaction.
    *
    * @since  0.9
@@ -417,88 +551,16 @@ class Match {
       $vals = array();
       
       foreach(array_keys($searchAttrs) as $attr) {
-        $rule = $searchAttrs[$attr];
-        $searchVal = $this->findRequestedAttrValue($attr);
-        
-        if(!$searchVal) {
-          $log->info("No value found in request payload for attribute '" . $attr . "', skipping this set");
+        try {
+          $asql = $this->buildAttributeSql($attr, $searchAttrs[$attr]);
+        }
+        catch(InvalidArgumentException $e) {
+          $log->info($e->getMessage() . ", skipping this set");
           continue 2;
         }
         
-        // Make sure this attribute is specified for the requested search type
-        
-        if(!isset($matchConfig['attributes'][$attr]['search'][$rule])
-           || !($matchConfig['attributes'][$attr]['search'][$rule])) {
-          throw new InvalidArgumentException("Attribute '" . $attr . "' is not configured for '" . $rule . "' search");
-        }
-        
-        $sql .= " AND ";
-        
-        // Assemble an appropriate clause according to the configuration, and also
-        // adjust $searchVal as needed
-        
-        $select = "";
-        
-        // Case insensitive?
-        if(isset($matchConfig['attributes'][$attr]['casesensitive'])
-           && !$matchConfig['attributes'][$attr]['casesensitive']) {
-          $select .= "lower(";
-          $searchVal = strtolower($searchVal);
-        }
-        
-        // Strip out non-alphanumeric characters?
-        if(isset($matchConfig['attributes'][$attr]['alphanum'])
-           && $matchConfig['attributes'][$attr]['alphanum']) {
-          $select .= "regexp_replace(";
-          $searchVal = preg_replace('/[^A-Za-z0-9]/', '', $searchVal);
-        }
-        
-        // The actual column name
-        $select .= $matchConfig['attributes'][$attr]['column'];
-        
-        // Close any statement we opened
-        if(isset($matchConfig['attributes'][$attr]['alphanum'])
-           && $matchConfig['attributes'][$attr]['alphanum']) {
-          $select .= ", '[^A-Za-z0-9]', '', 'g')";
-        }
-        
-        if(isset($matchConfig['attributes'][$attr]['casesensitive'])
-           && !$matchConfig['attributes'][$attr]['casesensitive']) {
-          $select .= ")";
-        }
-        
-        $vals[] = $searchVal;
-        
-        switch($rule) {
-          case 'distance':
-            $sql .= "levenshtein_less_equal("
-                 . $select
-                 . ",?,"
-                 . $matchConfig['attributes'][$attr]['search'][$rule]
-                 . ") < "
-                 . ($matchConfig['attributes'][$attr]['search'][$rule] + 1);
-            break;
-          case 'exact':
-            $sql .= $select . "=?";
-            break;
-          case 'soundex':
-            throw new RuntimeException("Not implemented (soundex)");
-            break;
-          case 'substr':
-            // Pull out the from and for parameters
-            $a = explode(",", $matchConfig['attributes'][$attr]['search'][$rule], 2);
-            $sql .= "substring("
-                 . $select
-                 . " from "
-                 . $a[0] . " for " . $a[1]
-                 . ") = substring(? from "
-                 . $a[0] . " for " . $a[1]
-                 . ")";
-            break;
-          default:
-            throw new InvalidArgumentException("Unknown search rule: " . $rule);
-            break;
-        }
+        $sql .= " AND " . $asql['sql'];
+        $vals = array_merge($vals, $asql['values']);
       }
       
       // XXX Make sure all required attributes were defined
@@ -528,8 +590,22 @@ class Match {
               
               if($requested // Make sure value is not null
                  && ($requested != $r->fields[ $matchConfig['attributes'][$attr]['column'] ])) {
-                $log->info("Candidate reference ID " . $r->fields['reference_id'] . " downgraded to potential due to invalidating attribute " . $attr);
-                $confidence = 85;
+                // Before we throw an error, see if any crosscheck fields matched
+                $xcok = false;
+                
+                if(!empty($matchConfig['attributes'][$attr]['crosscheck'])) {
+                  foreach(array_keys($matchConfig['attributes'][$attr]['crosscheck']) as $xcattr) {
+                    if($requested == $r->fields[ $matchConfig['attributes'][$xcattr]['column'] ]) {
+                      $xcok = true;
+                      break;
+                    }
+                  }
+                }
+                
+                if(!$xcok) {
+                  $log->info("Candidate reference ID " . $r->fields['reference_id'] . " downgraded to potential due to invalidating attribute " . $attr);
+                  $confidence = 85;
+                }
               }
             }
           }
