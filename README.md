@@ -221,6 +221,10 @@ example, one could collect both official and preferred names by defining one
 given name (and one family name) with group `official` and one with group
 `preferred`.
 
+If group is not specified for attributes with multiple fields (such as name
+and address) then the first attribute with the specified name found in the
+request will be used, regardless of group/type.
+
 ### `invalidates` Keyword
 
 This boolean keyword converts a canonical match to a potential match if the

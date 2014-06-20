@@ -218,47 +218,71 @@ class Match {
       if(!empty($matchConfig['attributes'][$attr]['group'])) {
         $grouping = $matchConfig['attributes'][$attr]['group'];
       }
+      
+      // Attributes can be of several forms:
+      //  - simple: "sor", "dateOfBirth"
+      //  - aliases: "identifier:sor", which is positional in the URL
+      //  - type specified: "identifier:national" (national is a type)
+      //  - field specified: "name:family" (family is a field, grouping is type)
+      
+      if($wireAttribute == 'identifier:sor') {
+        // Special case (alias)
+        $value = $this->requestAttributes['sorid'];
+      } elseif(strchr($wireAttribute, ":")) {
+        // Could be type or field specified
         
-      switch($wireAttribute) {
-        case 'identifier:national':
-        case 'identifier:sor-affiliate':
-        case 'identifier:sor-employee':
-        case 'identifier:sor-student':
-          $n = explode(':', $wireAttribute, 2);
-          // Need to walk identifiers to find right type
-          foreach($this->requestAttributes['identifiers'] as $xi) {
-            if(!empty($xi['type']) && $xi['type'] == $n[1]) {
-              // We've found the matching identifier type
-              if(!empty($xi['identifier'])) {
-                $value = $xi['identifier'];
+        // We need to know (1) which attributes are type specified and
+        // (2) which attributes have non-simple pluralization
+        $ts = array(
+          'address' => array(
+            'plural' => 'addresses'
+          ),
+          'emailAddress' => array(
+            'value'  => 'address',
+            'plural' => 'emailAddresses'
+          ),
+          'identifier'   => array(
+            'value'  => 'identifier'
+          )
+        );
+        
+        $wa = explode(":", $wireAttribute, 2);
+        
+        // Figure out the plural of this attribute (default is just append an s)
+        $p = (!empty($ts[ $wa[0] ]['plural']) ? $ts[ $wa[0] ]['plural'] : ($wa[0]."s"));
+        
+        if(isset($ts[ $wa[0] ]['value'])) {
+          // Type specified -- need to walk the attributes to find the right type
+          
+          $v = $ts[ $wa[0] ]['value'];
+          
+          foreach($this->requestAttributes[$p] as $ra) {
+            if(!empty($ra['type']) && $ra['type'] == $wa[1]) {
+              // We've found the matching attribute type
+              if(!empty($ra[$v])) {
+                $value = $ra[$v];
               }
               break;
             }
           }
-          break;
-        case 'name:family':
-        case 'name:given':
-          $n = explode(':', $wireAttribute, 2);
-          // Need to walk names to find right type
-          foreach($this->requestAttributes['names'] as $xi) {
-            if(!empty($xi['type']) && $xi['type'] == $grouping) {
-              // We've found the matching name type
-              if(!empty($xi[ $n[1] ])) {
-                $value = $xi[ $n[1] ];
+        } else {
+          // Field specified -- need to walk the attributes to find the right
+          // type, where type is the requested grouping
+          
+          foreach($this->requestAttributes[$p] as $ra) {
+            if((!empty($ra['type']) && $ra['type'] == $grouping)
+               // If grouping not specified, just use the first attribute
+               || !$grouping) {
+              // We've found the matching attribute type
+              if(!empty($ra[ $wa[1] ])) {
+                $value = $ra[ $wa[1] ];
               }
-              break;
             }
           }
-          break;
-        case 'sor':
-          $value = $this->requestAttributes['sor'];
-          break;
-        case 'identifier:sor':
-          $value = $this->requestAttributes['sorid'];
-          break;
-        default:
-          $value = $this->requestAttributes[$wireAttribute];
-          break;
+        }
+      } else {
+        // Default: assume simple
+        $value = $this->requestAttributes[$wireAttribute];
       }
     }
     
