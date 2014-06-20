@@ -268,6 +268,9 @@ is configured via the `confidence` Section.
   leftmost character is `1`, not `0`. To perform a substring match against the
   first three characters of a string, use `"1,3"`.
 
+It is possible to configure a substr match to behave like an exact match, just
+for the substring. See the `confidence` section, below, for more information.
+
 Addition search types may be supported in the future
 ([Issue #12] (https://github.com/ucidentity/or-match/issues/12),
 [Issue #13] (https://github.com/ucidentity/or-match/issues/13), and
@@ -367,14 +370,32 @@ Canonical and potential matches operate somewhat differently.
 
 A canonical match occurs when each attribute defined in a set (as provided in
 a search request) matches exactly (subject to modifiers such as `casesensitive`
-and `alphanum`) a record in the database. Only exact matches are tried,
-regardless of what search types are configured for the attribute.
+and `alphanum`) a record in the database. Ordinarily, only exact matches are
+tried (regardless of what search types are configured for the attribute), but
+see the section on partial exact matches, below.
 
 If a given canonical attribute set returns more than one candidate, the search
 result will automatically be converted to a potential match. Furthermore, all
 canonical sets are searched. That is, searching does not stop after a single
 match is found. If more than one candidate is found, the search result will
 again automatically be converted to a potential match.
+
+#### Partial Exact Matches
+
+Some search types other than `exact` can be configured to behave like an
+exact match for purposes of becoming a canonical match. For example, a `substr`
+match configured as `1,3` could consider `Pat` and `Patricia` to be the same,
+and for confidence purposes on some data this could be sufficient to create a
+canonical match. To configure this, set the `exact` rule to be the name of the
+search type. For example:
+
+    search['exact'] = "substr"
+    search['substr'] = "1,3"
+
+It is not possible to have more than one exact search criteria because the only
+search criteria that can be used in this way behave functionally equivalent.
+That is, a three character substring search will always match a superset of the
+records that an exact search will match.
 
 ### [confidence:potential]
 

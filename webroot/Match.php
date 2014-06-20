@@ -555,10 +555,16 @@ class Match {
       $searchAttrs = array();
       
       if($searchType == 'canonical') {
-        // Specify the search rule for each attribute, which will always be exact
+        // Specify the search rule for each attribute, which will always be exact,
+        // except for Partial Exact Match search types (eg: substr) when configured
         
         foreach($matchConfig['confidences'][$searchType][$ck] as $a) {
-          $searchAttrs[$a] = 'exact';
+          if(isset($matchConfig['attributes'][$a]['search']['exact'])
+             && $matchConfig['attributes'][$a]['search']['exact'] === 'substr') {
+            $searchAttrs[$a] = $matchConfig['attributes'][$a]['search']['exact'];
+          } else {
+            $searchAttrs[$a] = 'exact';
+          }
         }
       } else {
         // Search rules are specified in the configuration
