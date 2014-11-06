@@ -744,6 +744,34 @@ class Match {
   }
   
   /**
+   * Obtain the SOR Record associated with an SOR ID
+   *
+   * @since  0.9
+   * @param  string  $sor         Label for requesting System of Record
+   * @param  string  $sorid       SoR identifier for search request
+   * @return Array   Array of SOR data (empty if no records found)
+   */
+  
+  public function sorRecord($sor, $sorid) {
+    global $dbh;
+    $ret = array();
+    
+    $sql = "SELECT * FROM matchgrid WHERE sor=? AND sorid=?";
+    
+    $stmt = $dbh->Prepare($sql);
+    
+    // There should only be one row here...
+    
+    $r = $dbh->GetRow($stmt, array($sor, $sorid));
+    
+    if(!empty($r)) {
+      $ret[] = $this->mapResponseFields($r);
+    }
+    
+    return $ret;
+  }
+  
+  /**
    * Obtain the SOR Records associated with a reference identifier
    *
    * @since  0.9
@@ -760,7 +788,7 @@ class Match {
     $stmt = $dbh->Prepare($sql);
     
     $r = $dbh->Execute($stmt, array($referenceId));
-      
+    
     while(!$r->EOF) {
       $ret[] = $this->mapResponseFields($r->fields);
       
@@ -778,12 +806,19 @@ class Match {
    * @param  string  $sorid       SoR identifier for search request
    * @param  array   $attributes  Attributes provided for searching
    * @return string  Reference ID of record (which for now will always be what it originally was)
-   * @todo   Offer a rematch option?
+   * @todo   Offer a rematch option? Keep historical attributes for future matching (eg: against maiden name)?
    */
   
   public function update($sor, $sorid, $sorAttributes) {
     global $dbh;
     global $matchConfig;
+    
+    if(!$this->requestAttributes) {
+      // We're being called directly, probably as an update attributes request.
+      // Store the requested attributes.
+      
+      $this->requestAttributes = $sorAttributes;
+    }
     
     $sql = "UPDATE matchgrid
             SET ";
@@ -818,7 +853,7 @@ class Match {
     $sql .= "
              WHERE sor=?
              AND   sorid=?
-             RETURNING id";
+             RETURNING reference_id";
     
     $vals[] = $sor;
     $vals[] = $sorid;

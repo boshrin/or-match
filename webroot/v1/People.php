@@ -53,11 +53,29 @@ class People {
    * All functions in this class require auth
    * @access protected
    * @todo XXX resolve fuzzy match
-   * @todo XXX update match attributes
    */
 
   public function request($sor, $sorid, $sorAttributes) {
-    return $this->performRequest($sor, $sorid, $sorAttributes);
+    global $log;
+    
+    // First, check to see if we already have a row for this sor/sorid. If so,
+    // this becomes an Update Attributes Request.
+    
+    $Match = new Match;
+    
+    $rec = $Match->sorRecord($sor, $sorid);
+    
+    if(!empty($rec)) {
+      $log->info("Update attributes request received for " . $sor . "/" . $sorid);
+      $Match->update($sor, $sorid, $sorAttributes);
+      
+      $result = new stdClass();
+      ExtendedResponder::$result = $result;
+      
+      return $result;
+    } else {
+      return $this->performRequest($sor, $sorid, $sorAttributes);
+    }
   }
   
   /**
@@ -100,7 +118,8 @@ class People {
     $result = new stdClass();
     $retCode = 0;
     
-    $log->info("Request received for " . $sor . "/" . $sorid);
+    $log->info(($searchOnly ? "Search only request" : "Request")
+               . " received for " . $sor . "/" . $sorid);
     
     $dbh->StartTrans();
     
